@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Solar System</title>
+    <canvas id="myCanvas"
+            width="600"
+            height="600"
+            style="border:1px solid #000;">
+    </canvas>
+    <script src="https://bit.ly/2UIQnGB"></script>
+    <br>
+</head>
+<body>
+
+<script> "use strict"
+
+function setup() {
+    var canvas = document.getElementById('myCanvas');
+    var context = canvas.getContext('2d');
+    var m4 = twgl.m4;
+
+    var sunRotation = 0;            // to rotate earth object
+
+    var earthTheta = 0;
+    var earthX = 0;
+    var earthY = 210;
+    var earthRotation = 0;
+
+    var moonTheta = 0;
+    var moonZ = 0;
+    var moonY = 60;
+    var moonRotation = 0;
+
+    var goldrat = (1 + Math.sqrt(5)) / 2;
+
+    function moveToTx(x, y, z, Tx) {
+        var pt_in = [x, y, z];
+        var pt_out = m4.transformPoint(Tx, pt_in);
+        context.moveTo(pt_out[0], pt_out[1]);
+    }
+
+    function lineToTx(x, y, z, Tx) {
+        var pt_in = [x, y, z];
+        var pt_out = m4.transformPoint(Tx, pt_in);
+        context.lineTo(pt_out[0], pt_out[1]);
+    }
+
+    function drawDocecahedron(scale, color, Tx){
+        var myOne = scale;              // scaled value of 1
+        var myRat = scale * goldrat;    // scaled value of golden ratio
+        var myInv = 1 / myRat;          // scaled value of 1 / golden ratio
+
+        context.beginPath();
+        // Front
+        moveToTx(-myOne, -myOne, -myOne, Tx);
+        lineToTx(0, -myRat, -myInv, Tx);
+        lineToTx(myOne, -myOne, -myOne, Tx);
+        moveToTx(0, -myRat, -myInv, Tx);
+        lineToTx(0, -myRat, myInv, Tx);
+        lineToTx(-myOne, -myOne, myOne, Tx);
+        moveToTx(0, -myRat, myInv, Tx);
+        lineToTx(myOne, -myOne, myOne, Tx);
+        // Top
+        lineToTx(myInv, 0, myRat, Tx);
+        lineToTx(myOne, myOne, myOne, Tx);
+        moveToTx(myInv, 0, myRat, Tx);
+        lineToTx(-myInv, 0, myRat, Tx);
+        lineToTx(-myOne, myOne, myOne, Tx);
+        moveToTx(-myInv, 0, myRat, Tx);
+        lineToTx(-myOne, -myOne, myOne, Tx);
+        // Left
+        lineToTx(-myRat, -myInv, 0, Tx);
+        lineToTx(-myOne, -myOne, -myOne, Tx);
+        moveToTx(-myRat, -myInv, 0, Tx);
+        lineToTx(-myRat, myInv, 0, Tx);
+        lineToTx(-myOne, myOne, myOne, Tx);
+        moveToTx(-myRat, myInv, 0, Tx);
+        lineToTx(-myOne, myOne, -myOne, Tx);
+        // Back
+        lineToTx(0, myRat, -myInv, Tx);
+        lineToTx(myOne, myOne, -myOne, Tx);
+        moveToTx(0, myRat, -myInv, Tx);
+        lineToTx(0, myRat, myInv, Tx);
+        lineToTx(-myOne, myOne, myOne, Tx);
+        moveToTx(0, myRat, myInv, Tx);
+        lineToTx(myOne, myOne, myOne, Tx);
+        // Right
+        lineToTx(myRat, myInv, 0, Tx);
+        lineToTx(myOne, myOne, -myOne, Tx);
+        moveToTx(myRat, myInv, 0, Tx);
+        lineToTx(myRat, -myInv, 0, Tx);
+        lineToTx(myOne, -myOne, myOne, Tx);
+        moveToTx(myRat, -myInv, 0, Tx);
+        lineToTx(myOne, -myOne, -myOne, Tx);
+        // Bottom
+        lineToTx(myInv, 0, -myRat, Tx);
+        lineToTx(myOne, myOne, -myOne, Tx);
+        moveToTx(myInv, 0, -myRat, Tx);
+        lineToTx(-myInv, 0, -myRat, Tx);
+        lineToTx(-myOne, myOne, -myOne, Tx);
+        moveToTx(-myInv, 0, -myRat, Tx);
+        lineToTx(-myOne, -myOne, -myOne, Tx);
+
+        context.lineWidth = 1.0;
+        context.strokeStyle = color;
+        context.stroke();
+        //context.fillStyle = "red";
+        //context.fill();
+    }
+
+
+    function draw() {
+        canvas.width = canvas.width;
+
+        // Draw Background : black
+        context.beginPath();
+        context.rect(0, 0, 600, 600);
+        context.fillStyle = "#2d004d";
+        context.fill();
+
+
+        // translation to center of sun
+        var TCenterToCanvas = m4.translation([300, 300, 0]);
+
+        // Draw Sun
+        // tilt axis - constant
+        var TSunToCanvas = m4.multiply(m4.rotationX(.2), TCenterToCanvas);
+        // rotate by z axis
+        TSunToCanvas = m4.multiply(m4.rotationZ(sunRotation), TSunToCanvas);
+        drawDocecahedron(40, "#ffe172", TSunToCanvas);
+        sunRotation += .001;
+
+
+        // translations for Earth
+        // move to initial orbit point from sun
+        var TEarthToSun = m4.translation([earthX, earthY, 0]);
+        // relate this to canvas
+        var TEarthToCenter = m4.multiply(TEarthToSun, TCenterToCanvas);
+        var TEarthToCanvas = TEarthToCenter;
+        // tilt by y axis
+        TEarthToCanvas = m4.multiply(m4.rotationY(.25), TEarthToCanvas);
+        // rotate by z axis
+        TEarthToCanvas = m4.multiply(m4.rotationZ(earthRotation), TEarthToCanvas);
+        TEarthToCenter = m4.multiply(m4.rotationZ(earthRotation), TEarthToCenter);
+        earthTheta = (earthTheta + .002) % (2 * Math.PI);
+        earthX = 210 * (Math.sin(earthTheta));
+        earthY = 210 * (Math.cos(earthTheta));
+
+
+        // translations for Moon
+        // move to initial orbit point from earth
+        var TMoonToEarth = m4.translation([0, moonY, moonZ]);
+        // relate this to Canvas
+        var TMoonToCanvas = m4.multiply(TMoonToEarth, TEarthToCenter);
+        // tilt by Y axis
+        TMoonToCanvas = m4.multiply(m4.rotationY(.1), TMoonToCanvas);
+        // rotate by z axis
+        TMoonToCanvas = m4.multiply(m4.rotationX(moonRotation), TMoonToCanvas);
+        moonTheta = (moonTheta + .025) % (2 * Math.PI);
+        moonZ = 60 * (Math.sin(moonTheta));
+        moonY = 60 * (Math.cos(moonTheta));
+
+
+        // draw earth, moon
+        if(moonZ <= 0){
+            drawDocecahedron(20, "#006dcc", TEarthToCanvas);
+            earthRotation -= .02;
+            drawDocecahedron(8, "#ffe6e7", TMoonToCanvas);
+            moonRotation += .15;
+        }else{
+            drawDocecahedron(8, "#ffe6e7", TMoonToCanvas);
+            moonRotation += .15;
+            drawDocecahedron(20, "#006dcc", TEarthToCanvas);
+            earthRotation -= .02;
+        }
+
+
+        window.requestAnimationFrame(draw);
+    }
+
+    draw();
+}
+window.onload = setup;
+
+</script>
+
+</body>
+</html>

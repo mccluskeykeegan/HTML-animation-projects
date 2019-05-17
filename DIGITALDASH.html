@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Digital Dash</title>
+    <canvas id="myCanvas"
+            width="600"
+            height="400"
+            style="border:1px solid #000;">
+    </canvas>
+    <br><br>
+    <input id = "slider1" type = "range" min = "0" max = "400" /> MOVE HORIZONTALLY <br>
+    <input id = "slider2" type = "range" min = "-500" max = "500" /> MOVE VERTICALLY
+    <script src="https://bit.ly/2UIQnGB"></script>
+    <br><br>
+</head>
+<body>
+<script> "use strict"
+
+function setup(){
+    var canvas = document.getElementById('myCanvas');
+    var context = canvas.getContext('2d');
+    var m4 = twgl.m4;
+
+    // slider1 moves camera along circular path, always looking toward center
+    var slider1 = document.getElementById('slider1');
+    slider1.value = 200;
+    // slider2 moves camera up and down
+    var slider2 = document.getElementById('slider2');
+    slider2.value = 0;
+
+    // to hold data relevant to each planet
+    // index is: [[SUN], [EARTH], [MOON]]
+    var planets = [[],[],[]];
+
+    var sunHeight = 0;
+    var sunDirection = 1;
+    var earthTheta = 0;
+    var earthX = 4;
+    var earthZ = 0;
+
+    var earth_colors = ["#b3dbff", "#66b8ff"];
+    var sun_colors = ["#ff764d", "#ffc4b3"];
+
+    function initPlanet(planet_index, center){
+        // holds relevant values for all 8 triangles for each octahedron
+        /* index of each value within triangle:
+                0-2:    vertices
+                3:      point in middle of face of triangle
+                4:      color index
+                5:      distance from eye
+        */
+        var triangles = [];
+
+        var cx = center[0];
+        var cy = center[1];
+        var cz = center[2];
+
+        triangles.push([[0,1,0],[-1,0,-1],[1,0,-1], [0,.5,-.5], 0, 0.0]);
+        triangles.push([[0,1,0],[-1,0,1],[-1,0,-1], [-.5,.5,0], 1, 0.0]);
+        triangles.push([[0,1,0],[1,0,1],[-1,0,1], [0,.5,.5], 0, 0.0]);
+        triangles.push([[0,1,0],[1,0,-1],[1,0,1], [.5,.5,0], 1, 0.0]);
+        triangles.push([[0,-1,0],[1,0,-1],[-1,0,-1], [0,-.5,-.5], 1, 0.0]);
+        triangles.push([[0,-1,0],[1,0,1],[1,0,-1], [.5,-.5,0], 0, 0.0]);
+        triangles.push([[0,-1,0],[1,0,1],[-1,0,1], [0,-.5,.5], 1, 0.0]);
+        triangles.push([[0,-1,0],[-1,0,1],[-1,0,-1], [-.5,-.5,0], 0, 0.0]);
+
+        for(var lcv = 0; lcv < 8; lcv++) {
+            for(var i = 0; i < 4; i++){
+                triangles[lcv][i][0] += cx;
+                triangles[lcv][i][1] += cy;
+                triangles[lcv][i][2] += cz;
+            }
+            planets[planet_index][lcv] = (triangles[lcv]);
+        }
+    }
+
+    function moveToTx(pt_in, Tx) {
+        var pt_out = m4.transformPoint(Tx, pt_in);
+        context.moveTo(pt_out[0], pt_out[1]);
+    }
+
+    function lineToTx(pt_in, Tx) {
+        var pt_out = m4.transformPoint(Tx, pt_in);
+        context.lineTo(pt_out[0], pt_out[1]);
+    }
+
+    function drawplanet(Tx, color_array, camera_matrix, planet_index, center){
+        // initialize new planet with given center
+        initPlanet(planet_index, center);
+        // update distances for triangles
+        updatedistances(planet_index, camera_matrix);
+
+        // order triangles from furthest to closest for painter's algorithm - sort into ordered_triangles
+        var ordered_triangles = [];
+        var my_triangles = planets[planet_index];
+        for(var i = 0; i < 8; i++){
+            var largest = my_triangles[0];
+            var largest_index = 0;
+            for(var j = 1; j < 8; j++){
+                if(my_triangles[j][5] > largest[5]){
+                    largest = my_triangles[j];
+                    largest_index = j;
+                }
+            }
+            ordered_triangles[i] = largest;
+            my_triangles[largest_index][5] = 0;
+        }
+
+        for(var lcv = 0; lcv < 8; lcv++){
+//            console.log("Triangle: ", lcv, " - ", ordered_triangles[lcv][5], " - ", color_array[ordered_triangles[lcv][4]]);
+            drawtriangle(ordered_triangles[lcv], Tx, color_array);
+        }
+    }
+
+    function updatedistances(planet_index, camera_matrix){
+        for(var lcv = 0; lcv < 8; lcv++){
+            var myPoint = planets[planet_index][lcv][3];
+            var cam = m4.transformPoint(camera_matrix, myPoint);
+            planets[planet_index][lcv][5] = -cam[2];
+        }
+    }
+
+    function drawtriangle(triangle, Tx, color_array){
+        context.beginPath();
+
+        moveToTx(triangle[0], Tx);
+        lineToTx(triangle[1], Tx);
+        lineToTx(triangle[2], Tx);
+        lineToTx(triangle[0], Tx);
+
+        context.fillStyle = color_array[triangle[4]];
+        context.fill();
+    }
+
+    function draw(){
+        canvas.width = canvas.width;
+        console.clear();
+
+        // Draw Background : black
+        context.beginPath();
+        context.rect(0, 0, 600, 400);
+        context.fillStyle = "#66ffab";
+        context.fill();
+
+        var camera_angle = slider1.value * 0.01 * Math.PI;
+        var camera_height = slider2.value;
+
+        // lookat vectors - eye, target, up
+        var eye = [-700 * Math.cos(camera_angle), camera_height, 700 * Math.sin(camera_angle)];
+        var target = [0,0,0];
+        var up = [0,1,0];
+        // view matrix for camera
+        var camera_matrix = m4.inverse(m4.lookAt(eye, target, up));
+
+        // projection matrix for camera
+        var projection_matrix = m4.perspective(Math.PI / 6, 1, 5, 1000);
+        // translation matrix to center of canvas
+        var viewport_matrix = m4.multiply(m4.scaling([10000, -10000, 10000]), m4.translation([300, 200, 0]));
+        // combine camera, projection, viewport matrices
+        var cpv_matrix = m4.multiply(m4.multiply(camera_matrix, projection_matrix), viewport_matrix);
+
+        // determine whether earth or sun is closer to eye, which to draw first
+        var distance_to_sun_matrix = m4.transformPoint(camera_matrix, [0, sunHeight, 0]);
+        var distance_to_earth_matrix = m4.transformPoint(camera_matrix, [earthX, sunHeight, earthZ]);
+        var distance_to_sun = distance_to_sun_matrix[2];
+        var distance_to_earth = distance_to_earth_matrix[2];
+        // draw earth, sun in correct order
+        if(distance_to_sun < distance_to_earth){
+            // DRAW SUN
+            drawplanet(cpv_matrix, sun_colors, camera_matrix, 0, [0, sunHeight, 0]);
+            // DRAW EARTH
+            drawplanet(cpv_matrix, earth_colors, camera_matrix, 1, [earthX, sunHeight, earthZ]);
+        } else {
+            // DRAW EARTH
+            drawplanet(cpv_matrix, earth_colors, camera_matrix, 1, [earthX, sunHeight, earthZ]);
+            // DRAW SUN
+            drawplanet(cpv_matrix, sun_colors, camera_matrix, 0, [0, sunHeight, 0]);
+        }
+
+        // to update earth's orbit
+        earthTheta = (earthTheta + .01) % (2 * Math.PI);
+        earthX = 4 * (Math.sin(earthTheta));
+        earthZ = 4 * (Math.cos(earthTheta));
+
+        // to update height of both planets
+        if(sunDirection === 1){
+            if(sunHeight < 2){
+                sunHeight += .005;
+            } else {
+                sunHeight -= .005;
+                sunDirection = 0;
+            }
+        } else {
+            if(sunHeight > -2){
+                sunHeight -= .005;
+            } else {
+                sunHeight += .005;
+                sunDirection = 1;
+            }
+        }
+
+        window.requestAnimationFrame(draw);
+    }
+    draw();
+}
+window.onload = setup;
+
+</script>
+</body>
+</html>
